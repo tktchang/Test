@@ -1,0 +1,23 @@
+library(pscl)
+quinn.zip <- zeroinfl(RECRUITS ~ DENSITY*SEASON | 1, data=quinn, dist='poisson')
+
+exp(-3.0037)
+##back transform 
+#odd of false compare to true
+
+##count data must come from a poisson process
+
+plogis(-3.0037)
+#probably of a false zero (not detecing thing when they occur) = 5%
+##95% odd to be true zero to odd of false zero
+##so zeros are true zeros
+
+quinn.zip <- zeroinfl(RECRUITS ~ DENSITY*SEASON | SEASON, data=quinn, dist='poisson')
+
+plogis(-2.16)
+plogis(-0.216)
+
+
+#### example
+
+

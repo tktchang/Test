@@ -1,0 +1,27 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1600814043945.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "00543708",
+    "lastKnownWriteTime" : 1600870527,
+    "last_content_update" : 1600870527290,
+    "path" : "~/Desktop/R workshop/Rgit/SUYR_public/2020.09.30.R",
+    "project_path" : "SUYR_public/2020.09.30.R",
+    "properties" : {
+        "cursorPosition" : "514,2",
+        "ignored_words" : "collinearity\n",
+        "scrollLine" : "492",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

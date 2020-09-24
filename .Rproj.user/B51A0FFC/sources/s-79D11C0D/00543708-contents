@@ -1,0 +1,516 @@
+###link function###
+#binomial link=logit#
+
+#map them so that they are on the same scale, transform the scale back again
+
+##na.rm remove all the na value (missing value)##
+mean(c(1,2,3,NA))
+mean(c(1,2,3,NA), na.rm=T)
+
+##$class
+
+#### make summary figure ####
+
+polis.grid = with(polis, list(RATIO = seq(min(RATIO, na.rm=TRUE), max(RATIO,na.rm=TRUE), len=100)))
+
+##prediction##
+newdata=emmeans(polis.glm, ~RATIO, at=polis.grid, type='response') %>%  ##look at the prob of the prediction and the L confidence level
+  as.data.frame %>%  ##put in data frame
+  kable()  ##put it in a table
+#the prediction is on the logit scale (the link scale)
+##"type='response" put it back into the effect scale!!
+
+ newdata %>% head ##look at the first 6 lines
+## the prob of having ?? is 97% for the first prediction
+## df Inf, what it will be like when the df is infinity
+ 
+ ggplot(newdata, aes(y=prob, x=RATIO)) +
+   geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), fill='blue', alpha=0.2) +
+   geom_line() +
+   theme_classic()
+##plot of prob against RATIO
+
+ ggplot(newdata, aes(y=prob, x=RATIO)) +
+   geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), fill='blue', alpha=0.2) +
+   geom_line() +
+   theme_classic() +
+   geom_hline(yintercept=0.5, linetype='dashed') 
+##add a dash line at prob=0.5
+ 
+ ggplot(newdata, aes(y=prob, x=RATIO)) +
+   geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), fill='blue', alpha=0.2) +
+   geom_line() +
+   theme_classic() +
+   geom_hline(yintercept=0.5, linetype='dashed') +
+   scale_x_continuous(expand=c(0,0)) + scale_y_continuous(expand=c(0,0))
+##remove the gap at x and y axes "scale_x/y_continuous(expand)
+ 
+ ggplot(newdata, aes(y=prob, x=RATIO)) +
+   geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), fill='orange', alpha=0.2) +
+   geom_line() +
+   geom_point(data=polis, aes(y=PA)) +  ##add the points
+   theme_classic() +
+   geom_hline(yintercept=0.5, linetype='dashed')
+ 
+summary(polis.glm)
+
+#### the amount of explained variation to the total variation = r-square!!!
+##-->explained Sum of Square divided by unexplained Sum of Square
+
+##deviance = overall difference, the total amount not explained 
+
+1-(polis.glm$deviance/polis.glm$null)
+##a pseudo r-square
+##our model explain 45% of the variation
+
+
+coef(polis.glm)
+##see the intercept and slope
+
+polis.glm$coef
+##the other way to see the intercept and slope
+
+-polis.glm$coef[1]/polis.glm$coef[2]
+##ld50
+##intercept divide by the slope = x when the prob is at 50%
+
+(ld50 <- -polis.glm$coef[1]/polis.glm$coef[2])
+##wrap a statement in bracket(), print it as well after save it as a variable
+
+ld=MASS::dose.p(polis.glm, p=c(0.5,0.9)) ##use the dose.p function in the package MASS!!
+## for example :dplyr::select" --> use the select function of dplyr
+## dose is the terminology for the ld
+
+ld
+
+ld.SE = attr(ld, "SE")
+ld = data.frame(LD = attr(ld, 'p'),
+                Dose = as.vector(ld),
+                SE = ld.SE) %>%
+  mutate(lower=Dose-SE*qnorm(0.975),
+         upper=Dose+SE*qnorm(0.975))
+
+qnorm(0.975)
+#=1.959964
+##95% confidence interval, usually people will say it equals to 2 standard deviation (1.96~2)
+
+
+#####################
+#### example 3 ######
+#####################
+peake = read_csv('../data/peakquinn.csv', trim_ws=TRUE)
+
+glimpse(peake)
+head(peake)
+summary(peake)
+
+##two continuous variables
+##count data --> poisson (can't go lower than 0), but if it is far from 0, will look like normal
+
+ggplot(peake, aes(y=INDIV, x=AREA)) +
+  geom_point()+
+  geom_smooth()
+##look like the variance increases when the mean increases
+##and not a straight line
+
+ggplot(peake, aes(y=INDIV, x=AREA)) +
+  geom_point() +
+  geom_smooth() +
+  scale_y_log10()
+##transform the y-axis into a log scale
+##mimic a log transformation of the data
+
+ggplot(peake, aes(y=INDIV, x=AREA)) +
+  geom_point() +
+  geom_smooth() +
+  scale_x_log10() +
+  scale_y_log10()
+##transform both axes
+##more a straight line, look like it is linear
+
+#an option that the paper took was transform both the x(AREA) and y(INDIV) data
+##but poisson is more sensible than transforming the data
+
+
+######wrong lm model used#########
+peake.lm <- lm(INDIV~AREA, data=peake)
+autoplot(peake.lm, which=1:6)
+##see if we use the wrong model, what the diagnostic plots look like
+##not constant variance
+##QQ plot nor a perfect straight line
+##cook D, one pint is over 0.8, possible outlyer that contribute
+
+peak.resid <- simulateResiduals(peake.lm)
+plot(peak.resid)
+##more diagnostic of DHARMa
+##the residuals are with problem, should sit on the quantile line
+##some non-linearity in the residuals
+
+
+#####poisson model#######
+peake.glm <- glm(INDIV ~ log(AREA), data=peake,
+                 family=poisson(link='log'))
+
+autoplot(peake.glm, which=1:6)
+##not better
+
+peak.resid <- simulateResiduals(peake.glm)
+plot(peak.resid)
+##not better as well, the model seems not a good fit
+
+testDispersion(peak.resid)
+##the observed dispersion is far away from the expected
+
+##The 1st reason (cause) can be the model is too simplistic, the increase in area does not link to the increase of indiv
+##may be other covariance is needed to explain the response
+##not only affect by area
+
+##possible solution-->add a dummy variable, add as a random effect as a proxy of all other variables
+##observational random effect
+
+##2nd cause will be clumping, the individuals are hanging out together (aggregate)
+##solution--> negative binomial can account for clumpiness
+
+##3rd cause can be excessive zeros (zero inflated)
+##will lead to over-dispersion
+##can be false zeros, can not detect only
+##a particular of model can deal with this (zero inflated model) 
+##if the zeros are real, need to treat them as binary, presence absence
+
+testZeroInflation(peak.resid)
+##to see if it is zero inflated
+##-->not zero inflated
+
+library(MASS)
+
+##fit a negative binomial##
+
+peake.glm1 <- glm.nb(INDIV ~ log(AREA), data=peake)
+
+autoplot(peake.glm1, which=1:6)
+
+peake.resid <- simulateResiduals(peake.glm1)
+plot(peak.resid)
+
+AIC(peake.glm, peake.glm1)
+##information criteria is based on likelihood
+##don't use r-square to compare model, which based on residuals
+##AIC the lower the better
+##negative AIC is possible, the more negative is better
+#no meaning in the value itself, only use to compare models, no scale
+##if the difference is beyond 2, then the models are different
+
+##poisson model estimate intercept and slope 
+##negative binomial estimate variance, intercept and slope (more df is used, so it is penalized by the extra df used)
+
+##correct small sample size, AICc in the MUMIn package
+AICc(peake.glm, peake.glm1)
+
+plot(allEffects(peake.glm1, residuals=T), type='response')
+##back transform the area into effect scale
+##the best to plot the model
+##there is relationship
+
+plot_model(peake.glm1, type='eff', show.data=FALSE, terms='AREA')
+
+summary(peake.glm1)
+
+exp(0.82) #transform back to effect
+##multiply the individual by 2.27, not adding 2.27
+
+#for every 1 unit change in x-axis (log area), the number of indivdual increases by a factor of 2.27
+#127% increase in 1 unit of log area
+
+#Dispersion parameter for Negative Binomial(7.3693) family taken to be 1
+#7 times the dispersion than we expected for poisson distribution
+
+tidy(peake.glm1, conf.int = T)
+##see the effect of lower and upper confidence interval
+
+tidy(peake.glm1, conf.int = T, exponentiate = T)
+## the effect can be as low as 2 times (double) or 2.6 times (160% increase), mean 2.28 times 
+#interval cross 1? --> positive trend
+
+tidy(peake.glm1, conf.int = T, exponentiate = T) %>%kable
+
+1-(peake.glm1$deviance/peake.glm1$null)
+#r-square in the simple way (#### the amount of explained variation to the total variation = r-square!!!)
+#works for simple model, but not the good way to get r2 from complex model
+
+r.squaredLR((peake.glm1))
+#the other way to get r-square
+##the model explain 85% of the variation
+
+peake.grid = with(peake, list(AREA = seq(min(AREA, na.rm=TRUE), max(AREA, na.rm=TRUE), len=100)))
+
+peake.grid = with(peake, list(AREA = seq(min(AREA), max(AREA), len=100)))
+
+newdata1=emmeans(peake.glm1, ~AREA, at=peake.grid, type='response') %>%  ##look at the prob of the prediction and the L confidence level
+  as.data.frame
+
+head(newdata1)
+
+ggplot(newdata1, aes(y=response, x=AREA))+
+  geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), fill='blue', alpha=0.3)+
+  geom_line()+
+  theme_classic()
+##regular axes
+
+ggplot(newdata1, aes(y=log(response), x=log(AREA)))+
+  geom_ribbon(aes(ymin=log(asymp.LCL), ymax=log(asymp.UCL)), fill='blue', alpha=0.3)+
+  geom_line()+
+  theme_classic()
+##transform the axis but not the data, for easy interpretation
+
+ggplot(newdata1, aes(y=response, x=AREA))+
+  geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), fill='gold', alpha=0.3)+
+  geom_line()+
+  geom_point(data=peake, aes(y=INDIV))+
+  scale_x_log10()+
+  scale_y_log10()+
+  theme_classic()
+##transform the axes, can show a linear relation better
+
+
+
+#######################
+###### example 4 ######
+#######################
+
+##Loyn (1987) modeled the abundance of forest birds with six predictor variables 
+##  (patch area, distance to nearest patch, distance to nearest larger patch, 
+##  grazing intensity, altitude and years since the patch had been isolated).
+
+loyn = read_csv('../data/loyn.csv', trim_ws=TRUE)
+##load the dataset
+
+glimpse(loyn)
+##abundance is not integer, not raw data, not count data
+
+##can't have correlated predictors
+##standardize one predictor for the other one
+##underestimated the effect, or change from positive effect to negative effect, will become nonsense
+
+##DIST	Distance to nearest patch - predictor variable
+##LDIST	Distance to nearest larger patch - predictor variable
+##these two can be correlated
+
+scatterplotMatrix(~ABUND+DIST+LDIST+AREA+GRAZE+ALT+YR.ISOL, data=loyn,
+                  diagonal = list(method='boxplot'))
+##to check collinearity
+##Abundance settle the normal distribution but not the DIST, LDIST and AREA and YR COL(but this skew the other way)
+
+scatterplotMatrix(~ABUND+log(DIST)+log(LDIST)+log(AREA)+GRAZE+ALT+YR.ISOL, data=loyn,
+                  diagonal = list(method='boxplot'))
+##log transform the DIST, LDIST and AREA
+##grazing only gets 5 levels, may be not treating it as continuous but categorical
+##DIST and LDIST look like collinear
+
+loyn = loyn %>% mutate(fGRAZE=factor(GRAZE))
+#convert grazing into categorical
+
+##look at the relative importance of each predictor, which one has the greatest effect
+##all on different scales, need to put them on the same scale, same range and standard deviation
+##can center the mean to 0
+
+loyn.lm <- lm(ABUND~scale(log(DIST)) +
+                scale(log(LDIST)) +
+                scale(log(AREA)) +
+                fGRAZE + 
+                scale(ALT) +
+                scale(YR.ISOL), data=loyn)
+
+##we don't want predictor A correlates with B+C (therefore not significant trend A~B+C)
+##or B with A+C
+##or C with A+B
+#R2 = 0.6 (0.6 correlation), some use 0.8 correlation
+##VIF = 1/(1-R2), when R2=0.6, VIF=3
+
+vif(loyn.lm)
+#see which is correlated
+##there is a categorical variable - grazing
+##GVIF^(1/(2*Df))-->when there is categorical variable, look at the second column
+##if two variables are correlated, they can't go into the same model
+
+autoplot(loyn.lm, which=1:6)
+##check normality, covariance
+##there are two points driving the line down in the first plot, but not very concerning
+##slight issue in the QQ plot
+##cook's d looks alright
+
+##need to plot the residual against each predictor
+
+
+ggplot(data=NULL, aes(y=as.vector(resid(loyn.lm)), x=scale(log(loyn$AREA))))
+
+ggplot(data=NULL, aes(y=as.vector(resid(loyn.lm)), x=scale(log(loyn$AREA)))) +
+  geom_point()+
+  geom_smooth()
+##residual of AREA
+
+ggplot(data=NULL, aes(y=as.vector(resid(loyn.lm)), x=scale(log(loyn$DIST)))) +
+  geom_point()
+##residual of DIST
+
+ggplot(data=NULL, aes(y=as.vector(resid(loyn.lm)), x=loyn$fGRAZE)) +
+  geom_boxplot()+
+  geom_point()
+##grazing residual
+##need to make sure they are roughly around zero
+
+loyn.resid <- simulateResiduals(loyn.lm)
+plot(loyn.resid)
+##potentially one outlyer in the residual plot, otherwisw they look ok
+
+loyn.resid$scaledResiduals
+
+plot(allEffects(loyn.lm, residuals=T), type='response')
+##look like Area has the largest effect
+#
+
+plot_grid(plot_model(loyn.lm, type='eff'))
+
+plot_model(loyn.lm, type='est', transform = 'c')
+##no effect for the dist and ldist
+##area has effect
+##relative importance of each predictor
+##estimate is the slope
+##fGRAZE 1 is missing
+##the different categories is the different from fGRAZE[1]
+
+summary(loyn.lm)
+##each line, e.g.scale(log(DIST)), the effect of dist when all of the other predictors are kept constant, at their average in this case is 0
+##intercept is about effect of fGRAZE1 when all other predictors are at their average therefore 0
+##categorical predictor has to be dealt differently
+##half a bird more in GRAZE2 than GRAZE1, but just noise foe example
+##but GRAZE 5 has a significant effect
+##Multiple R-squared:  0.7295, 72% explained, quite good
+
+tidy(loyn.lm, conf.int=TRUE)
+##see the low and high confidence level
+
+#####but are all the predictors necessary to be there in the model??
+#two approached to do that
+
+#1st# 
+#step-wise, will take out one predictor at a time, probably the one with smallest effect size
+#or take out the one with least significance according the p-values, but p-value doesn't necessary tell
+#the variable is not useful in the model
+#may hurt something else, reducing the power??
+
+#2nd#
+#dredge process in MUMIn package
+##compare AIC, need same sample size (no. of observation), becauseprobablity will be affected if sample size is different
+##unfair comparison
+
+loyn.lm = update(loyn.lm, na.action=na.fail)
+
+
+dredge(loyn.lm, rank="AICc")
+#include grazing (wuth the + sign)
+#include Area (with the partial slope)
+##second model with ALT, estimate one more slope, so one more df
+##simulate if some of the predictors are not measured, but are they important in the model?
+
+##average the first few models
+##have the weight to get the weighted average of the effect, best model will be weighted more
+##need to decide a cut off, so how many models to include
+loyn.av <- model.avg(dredge(loyn.lm, rank="AICc"),
+                     subset=delta<=10)
+
+summary(loyn.av) 
+##average by the weight
+##first table, the missing value will be considered as 0 (towards 0)
+##second table, omit the missing ones and do an average of the rest (away from 0)
+##both are biased and the usage depends on what you want
+##not necessary give us the best ecological model either
+
+##group the predictors into different categories/aspect/angles
+##e.g. dist contribute to the connectivity
+##e.g. some may contribute the climate
+
+
+loyn.lm1 <- update (loyn.lm, .~scale(log(DIST)) + scale(log(LDIST))) ##connectivity
+loyn.lm2 <- update (loyn.lm, .~scale(log(AREA)) + fGRAZE + scale(YR.ISOL)) 
+loyn.lm3 <- update (loyn.lm, .~scale(log(AREA)) + fGRAZE)
+loyn.lm4 <- update (loyn.lm, .~scale(ALT))
+loyn.null <- update (loyn.lm, .~1)
+##compare the models, use AIC
+##compare with something to see if every model is a useful model
+
+AICc(loyn.lm, loyn.lm1, loyn.lm2, loyn.lm3, loyn.lm4, loyn.null)
+##loyn.lm1 is not useful at all (AIC>null)
+##may use loyn.lm3 as the base to see if other models are useful
+##in this way, can consider the model base on different aspects, can explain the models in a more sensible way
+##only when you have sample size >30 per predictor, use AIC
+
+
+#assume we are interested in model 3 (lm3)
+
+loyn.grid <- with(loyn, list(fGRAZE = levels (fGRAZE),
+                            AREA = seq(min(AREA), max(AREA), len=100)))
+
+
+newdata2=emmeans(loyn.lm3, ~AREA|fGRAZE, at=loyn.grid) %>% as.data.frame
+
+## separately for each level of grazing (~AREA|fGRAZE)
+
+head(newdata2)
+
+ggplot(newdata2, aes(y=emmean, x=AREA, colour=fGRAZE, fill=fGRAZE)) +
+  geom_ribbon(aes(ymin=lower.CL, ymax=upper.CL), colour=NA, alpha=0.2) +
+  geom_line() +
+  theme_classic()
+
+ggplot(newdata2, aes(y=emmean, x=AREA, colour=fGRAZE, fill=fGRAZE)) +
+  geom_point(data=loyn, aes(y=ABUND, colour=fGRAZE)) +
+  geom_ribbon(aes(ymin=lower.CL, ymax=upper.CL), colour=NA, alpha=0.2) +
+  geom_line() +
+  scale_x_log10(labels=scales::comma) +
+  scale_y_continuous('Abundance')+
+  theme_classic()
+##the lines of the GRAZE are parallel, because the effect are additive in the model
+##loyn.lm3 <- update (loyn.lm, .~scale(log(AREA)) "+" fGRAZE)
+##as assumption here, homogenous slope
+
+loyn %>% group_by(fGRAZE) %>% do({data.frame(AREA=seq(min(.$AREA), max(.$AREA), len=100))})
+
+summary(loyn.lm3)
+##partial slope for area
+##if the different categorical data don't overlap much, that will be a problem
+#can scale the different level
+##example GBR temperature in N C & S regions, need to center the temperature and see how far they are away from the center
+
+loyn.glm <- glm(ABUND~scale(log(AREA)) * fGRAZE, data=loyn, family=gaussian(link='log'))
+#treat the data as poisson
+
+loyn.glm1 <- glm(ABUND~scale(log(AREA)) + fGRAZE, data=loyn, family=gaussian(link='log'))
+# additive
+
+AICc(loyn.glm, loyn.glm1)
+#see which is the better model
+
+anova(loyn.glm, loyn.glm1, test='Chisq')
+
+summary(loyn.glm)
+##scale(log(AREA) is the slope of fGRAZE1
+##fGRAZE2 estimate is the different in intercept value of fGRAZE 2 from fGRAZE1 (at the average area value)
+##scale(log(AREA)):fGRAZE2 --> the different in value of the slope from scale(log(AREA))
+
+plot(allEffects(loyn.glm))
+
+newdata3=emmeans(loyn.glm, ~AREA|fGRAZE, at=loyn.grid, 
+                 type='response') %>% as.data.frame
+
+head(newdata3)
+
+ggplot(newdata3, aes(y=response, x=AREA, colour=fGRAZE, fill=fGRAZE)) +
+  geom_ribbon(aes(ymin=asymp.LCL, ymax=asymp.UCL), colour=NA, alpha=0.3) +
+  geom_line() +
+  scale_y_log10('Abundance')+
+  scale_x_log10(labels=scales::comma)+
+  theme_classic()+
+  scale_colour_viridis_d() +  #fill diff colour
+  scale_fill_viridis_d()
+  
+
